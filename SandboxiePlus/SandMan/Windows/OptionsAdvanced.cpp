@@ -31,6 +31,7 @@ void COptionsWindow::CreateAdvanced()
 	connect(ui.chkElevateRpcss, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
 	connect(ui.chkProtectSystem, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
 	connect(ui.chkDropPrivileges, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
+	connect(ui.chkDropConHostIntegrity, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
 
 	connect(ui.chkOpenCOM, SIGNAL(clicked(bool)), this, SLOT(OnOpenCOM()));
 	connect(ui.chkComTimeout, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
@@ -104,6 +105,9 @@ void COptionsWindow::CreateAdvanced()
 	InitLangID();
 
 	connect(ui.chkHideFirmware, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
+	connect(ui.chkHideUID, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
+	connect(ui.chkHideSerial, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
+	connect(ui.chkHideMac, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
 	connect(ui.cmbLangID, SIGNAL(currentIndexChanged(int)), this, SLOT(OnAdvancedChanged()));
 	connect(ui.btnDumpFW, SIGNAL(clicked(bool)), this, SLOT(OnDumpFW()));
 
@@ -166,6 +170,7 @@ void COptionsWindow::LoadAdvanced()
 	ui.chkElevateRpcss->setChecked(m_pBox->GetBool("RunRpcssAsSystem", false));
 	ui.chkProtectSystem->setChecked(!m_pBox->GetBool("ExposeBoxedSystem", false));
 	ui.chkDropPrivileges->setChecked(m_pBox->GetBool("StripSystemPrivileges", true));
+	ui.chkDropConHostIntegrity->setChecked(m_pBox->GetBool("DropConHostIntegrity", false));
 
 	ui.chkForceRestart->setChecked(m_pBox->GetBool("ForceRestartAll", false));
 
@@ -285,6 +290,9 @@ void COptionsWindow::LoadAdvanced()
 	//
 
 	ui.chkHideFirmware->setChecked(m_pBox->GetBool("HideFirmwareInfo", false));
+	ui.chkHideUID->setChecked(m_pBox->GetBool("RandomRegUID",false));
+	ui.chkHideSerial->setChecked(m_pBox->GetBool("HideDiskSerialNumber", false));
+	ui.chkHideMac->setChecked(m_pBox->GetBool("HideNetworkAdapterMAC", false));
 
 	ui.cmbLangID->setCurrentIndex(ui.cmbLangID->findData(m_pBox->GetNum("CustomLCID", 0)));
 
@@ -420,6 +428,7 @@ void COptionsWindow::SaveAdvanced()
 	WriteAdvancedCheck(ui.chkElevateRpcss, "RunRpcssAsSystem", "y", "");
 	WriteAdvancedCheck(ui.chkProtectSystem, "ExposeBoxedSystem", "", "y");
 	WriteAdvancedCheck(ui.chkDropPrivileges, "StripSystemPrivileges", "", "n");
+	WriteAdvancedCheck(ui.chkDropConHostIntegrity, "DropConHostIntegrity", "y", "");
 
 	WriteAdvancedCheck(ui.chkComTimeout, "RpcMgmtSetComTimeout", "n", "");
 
@@ -569,6 +578,9 @@ void COptionsWindow::SaveAdvanced()
 	//
 
 	WriteAdvancedCheck(ui.chkHideFirmware, "HideFirmwareInfo", "y", "");
+	WriteAdvancedCheck(ui.chkHideUID, "RandomRegUID", "y", "");
+	WriteAdvancedCheck(ui.chkHideSerial, "HideDiskSerialNumber", "y", "");
+	WriteAdvancedCheck(ui.chkHideMac, "HideNetworkAdapterMAC", "y", "");
 
 	int CustomLCID = ui.cmbLangID->currentData().toInt();
 	if (CustomLCID) m_pBox->SetNum("CustomLCID", CustomLCID);

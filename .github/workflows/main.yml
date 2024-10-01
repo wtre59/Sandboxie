@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
   push:
-    branches: [ master ]
+    branches: [master, experimental]
     paths-ignore:
       # Case-sensitive paths to ignore on push events
       - '.editorconfig'
@@ -16,6 +16,7 @@ on:
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/workflows/codeql.yml'
       - '.github/workflows/codespell.yml'
+      - '.github/workflows/hash.yml'
       - '.github/workflows/lupdate.yml'
       - '.github/workflows/stale.yml'
       - '.github/workflows/test.yml'
@@ -35,7 +36,7 @@ on:
       - '**/AUTHORS'
       - '**/COPYING'
   pull_request:
-    branches: [ master ]
+    branches: [master, experimental]
     paths-ignore:
       # Case-sensitive paths to ignore on pull events
       - '.editorconfig'
@@ -47,6 +48,7 @@ on:
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/workflows/codeql.yml'
       - '.github/workflows/codespell.yml'
+      - '.github/workflows/hash.yml'
       - '.github/workflows/lupdate.yml'
       - '.github/workflows/stale.yml'
       - '.github/workflows/test.yml'
@@ -164,7 +166,7 @@ jobs:
 
       - name: Upload installer assets
         #if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4.3.4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: Assets
           path: |
@@ -173,7 +175,7 @@ jobs:
 
       - name: Upload Sandboxie x64
         #if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4.3.4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: Sandboxie_x64
           path: |
@@ -267,7 +269,7 @@ jobs:
 
       - name: Upload Sandboxie ARM64
         #if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4.3.4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: Sandboxie_ARM64
           path: |
@@ -336,7 +338,7 @@ jobs:
 
       - name: Upload Sandboxie x86
         #if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4.3.4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: Sandboxie_x86
           path: |

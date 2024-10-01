@@ -1315,12 +1315,18 @@ void CSandMan::OnRestartAsAdmin()
 	se.nShow = SW_HIDE;
 	se.fMask = 0;
 	ShellExecuteEx(&se);
-	OnExit();
+	m_bExit = true;
+	close();
 }
 
 void CSandMan::OnExit()
 {
 	m_bExit = true;
+	if (theConf->GetBool("Options/TerminateWhenExit", false)) {
+		if (theAPI->IsConnected()) {
+			theAPI->TerminateAll(!theConf->GetBool("Options/ExceptWhenAutoTerminate", false));
+		}
+	}
 	close();
 }
 
@@ -2579,7 +2585,7 @@ void CSandMan::OnStatusChanged()
 			CheckSupport();
 
 		int WizardLevel = abs(theConf->GetInt("Options/WizardLevel", 0));
-		if (WizardLevel < (theConf->GetInt("Options/CheckForUpdates", 2) != 1 ? SETUP_LVL_2 : SETUP_LVL_1)) {
+		if (WizardLevel < (!g_CertInfo.active ? SETUP_LVL_3 : (theConf->GetInt("Options/CheckForUpdates", 2) != 1 ? SETUP_LVL_2 : SETUP_LVL_1))) {
 			if (!CSetupWizard::ShowWizard(WizardLevel)) { // if user canceled, mark that and do not show again, until there is something new
 				if(QMessageBox::question(NULL, "Sandboxie-Plus", tr("Do you want the setup wizard to be omitted?"), QMessageBox::Yes, QMessageBox::No | QMessageBox::Default) == QMessageBox::Yes)
 					theConf->SetValue("Options/WizardLevel", -SETUP_LVL_CURRENT);
