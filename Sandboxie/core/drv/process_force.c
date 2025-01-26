@@ -221,8 +221,15 @@ _FX BOX *Process_GetForcedStartBox(
         return NULL;
     }
 
-    Process_GetProcessName(
-		Driver_Pool, (ULONG_PTR)ParentId, &nbuf, &nlen, &ParentName);
+    //
+    // initialize ParentName but only if the parent is not a system process
+    // 
+
+    if (!MyIsProcessRunningAsSystemAccount(ParentId)) {
+
+        Process_GetProcessName(
+            Driver_Pool, (ULONG_PTR)ParentId, &nbuf, &nlen, &ParentName);
+    }
 
     //
     // initialize some more state before checking process
@@ -369,6 +376,11 @@ _FX BOX *Process_GetForcedStartBox(
 		{
 			Log_Msg_Process(MSG_1301, ImageName, NULL, SessionId, ProcessId);
 		}
+    }
+
+    if (box && Conf_Get_Boolean(NULL, L"NotifyForceProcessEnabled", 0, FALSE) && box != (BOX *)-1)
+    {
+        Log_Msg_Process(MSG_1321, ImageName, box->name, SessionId, ProcessId);
     }
 
     //
