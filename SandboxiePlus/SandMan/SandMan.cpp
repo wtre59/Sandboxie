@@ -1319,7 +1319,7 @@ void CSandMan::OnRestartAsAdmin()
 	se.lpFile = buf;
 	se.nShow = SW_HIDE;
 	se.fMask = 0;
-	ShellExecuteEx(&se);
+	ShellExecuteExW(&se);
 	m_bExit = true;
 	close();
 }
@@ -2602,6 +2602,13 @@ void CSandMan::OnStatusChanged()
 				if(QMessageBox::question(NULL, "Sandboxie-Plus", tr("Do you want the setup wizard to be omitted?"), QMessageBox::Yes, QMessageBox::No | QMessageBox::Default) == QMessageBox::Yes)
 					theConf->SetValue("Options/WizardLevel", -SETUP_LVL_CURRENT);
 			}
+		}
+
+		if (theConf->GetInt("Options/ScanWindowsUpdates", 1) == 2)
+		{
+			auto Ret = QMessageBox::question(NULL, "Sandboxie-Plus", tr("Sandman die not finish enumerating installed windows updates last time, it probably hang.\n"
+				"Do you want to disable Windows Updates scanning from the the software compatibility detection?"), QMessageBox::Yes, QMessageBox::No | QMessageBox::Default);
+			theConf->SetValue("Options/ScanWindowsUpdates", Ret == QMessageBox::Yes ? 0 : 1);
 		}
 
 		if (theConf->GetBool("Options/AutoRunSoftCompat", true) && g_PendingMessage.isEmpty())

@@ -242,6 +242,7 @@ void CSbieView::CreateMenu()
 	
 	m_pMenuTools = m_pMenuBox->addMenu(CSandMan::GetIcon("Maintenance"), tr("Sandbox Tools"));
 		m_pMenuDuplicate = m_pMenuTools->addAction(CSandMan::GetIcon("Duplicate"), tr("Duplicate Box Config"), this, SLOT(OnSandBoxAction()));
+		m_pMenuDuplicateEx = m_pMenuTools->addAction(CSandMan::GetIcon("Duplicate"), tr("Duplicate Box with Content"), this, SLOT(OnSandBoxAction()));
 		m_pMenuExport = m_pMenuTools->addAction(CSandMan::GetIcon("PackBox"), tr("Export Box"), this, SLOT(OnSandBoxAction()));
 		m_pMenuExport->setEnabled(CArchive::IsInit());
 
@@ -343,6 +344,7 @@ void CSbieView::CreateOldMenu()
 
 		m_pMenuTools->addSeparator();
 		m_pMenuDuplicate = m_pMenuTools->addAction(CSandMan::GetIcon("Duplicate"), tr("Duplicate Sandbox Config"), this, SLOT(OnSandBoxAction()));
+		m_pMenuDuplicateEx = m_pMenuTools->addAction(CSandMan::GetIcon("Duplicate"), tr("Duplicate Sandbox with Content"), this, SLOT(OnSandBoxAction()));
 		m_pMenuExport = m_pMenuTools->addAction(CSandMan::GetIcon("PackBox"), tr("Export Sandbox"), this, SLOT(OnSandBoxAction()));
 		m_pMenuExport->setEnabled(CArchive::IsInit());
 
@@ -1176,6 +1178,25 @@ void CSbieView::OnSandBoxAction(QAction* pAction)
 
 void CSbieView::OnSandBoxAction(QAction* Action, const QList<CSandBoxPtr>& SandBoxes)
 {
+	auto RenderSandboxNameList_ = [&,this](const QList<CSandBoxPtr>& SandBoxes, int max_displayed = 10) -> QString
+	{
+		QString name_list = "";
+		for (int i = 0; i < SandBoxes.count() && i < max_displayed; i++)
+		{
+			if (i != 0) name_list.append("<br />");
+			name_list.append(QString::fromWCharArray(L"\u2022 ")); // Unicode bullet
+			name_list.append("<b>" + SandBoxes[i]->GetName().replace("_", " ") + "</b>");
+		}
+		if (SandBoxes.count() > max_displayed) 
+		{
+			name_list.append(tr("<br />"));
+			name_list.append(QString::fromWCharArray(L"\u2022 ")); // Unicode bullet
+			name_list.append(tr("... and %1 more").arg(SandBoxes.count() - max_displayed));
+		}
+			
+		return name_list;
+	};
+
 	QList<SB_STATUS> Results;
 
 	if (SandBoxes.isEmpty())
@@ -1295,7 +1316,7 @@ void CSbieView::OnSandBoxAction(QAction* Action, const QList<CSandBoxPtr>& SandB
  		if (theConf->GetInt("Options/WarnOpenRegistry", -1) == -1)
 		{
 			bool State = false;
-			if (CCheckableMessageBox::question(this, "Sandboxie-Plus", tr("WARNING: The opened registry editor is not sandboxed, please be careful and only do changes to the pre-selected sandbox locations.")
+			if (CCheckableMessageBox::question(this, "Sandboxie-Plus", tr("WARNING: The opened registry editor is not sandboxed, please be careful and only do changes to the preselected sandbox locations.")
 			  , tr("Don't show this warning in future"), &State, QDialogButtonBox::Ok | QDialogButtonBox::Cancel, QDialogButtonBox::Yes, QMessageBox::Information) != QDialogButtonBox::Ok)
 				return;
 
@@ -1349,7 +1370,7 @@ void CSbieView::OnSandBoxAction(QAction* Action, const QList<CSandBoxPtr>& SandB
 			SetForegroundWindow((HWND)pSnapshotsWindow->winId());
 		}
 	}
-	else if (Action == m_pMenuDuplicate)
+	else if (Action == m_pMenuDuplicate || Action == m_pMenuDuplicateEx)
 	{
 		QString OldValue = SandBoxes.first()->GetName().replace("_", " ");
 		QString Value = QInputDialog::getText(this, "Sandboxie-Plus", tr("Please enter a new name for the duplicated Sandbox."), QLineEdit::Normal, tr("%1 Copy").arg(OldValue));
@@ -1358,13 +1379,12 @@ void CSbieView::OnSandBoxAction(QAction* Action, const QList<CSandBoxPtr>& SandB
 		
 		QString Name = Value.replace(" ", "_");
 		SB_STATUS Status = theAPI->CreateBox(Name, false);
-
+		
+		CSandBoxPtr pSrcBox;
 		if (!Status.IsError())
 		{
-			CSandBoxPtr pBox = theAPI->GetBoxByName(Value);
-
 			QList<QPair<QString, QString>> Settings;
-			CSandBoxPtr pSrcBox = theAPI->GetBoxByName(SandBoxes.first()->GetName());
+			pSrcBox = theAPI->GetBoxByName(SandBoxes.first()->GetName());
 			qint32 status = 0;
 			if (!pSrcBox.isNull()) Settings = pSrcBox->GetIniSection(&status);
 			if (Settings.isEmpty())
@@ -1375,6 +1395,8 @@ void CSbieView::OnSandBoxAction(QAction* Action, const QList<CSandBoxPtr>& SandB
 				{
 					if (I->first == "FileRootPath" && !I->second.toUpper().contains("%SANDBOX%"))
 						continue; // skip the FileRootPath if it does not contain a %SANDBOX% 
+					if (I->first == "Enabled")
+						continue; // dont duplocate thats already set on create
 
 					Status = theAPI->SbieIniSet(Name, I->first, I->second, CSbieAPI::eIniAppend, false);
 					if (Status.IsError())
@@ -1386,6 +1408,25 @@ void CSbieView::OnSandBoxAction(QAction* Action, const QList<CSandBoxPtr>& SandB
 			theAPI->ReloadBoxes(true);
 		}
 
+		CSandBoxPtr pDestBox;
+		if (!Status.IsError())
+		{
+			pDestBox = theAPI->GetBoxByName(Name);
+			if(!pDestBox)
+				Status = SB_ERR(SB_FailedCopyConf, QVariantList() << SandBoxes.first()->GetName() << tr("Not Created"));
+		}
+
+		if (Action == m_pMenuDuplicateEx && !Status.IsError())
+		{
+			auto pSrcBoxEx = pSrcBox.objectCast<CSandBoxPlus>();
+			SB_PROGRESS Progress = pSrcBoxEx->CopyBox(pDestBox->GetFileRoot());
+
+			if (Progress.GetStatus() == OP_ASYNC)
+				Status = theGUI->AddAsyncOp(Progress.GetValue(), false, tr("Copying: %1").arg(Value));
+			else
+				Status = Progress;
+		}
+		
 		Results.append(Status);
 	}
 	else if (Action == m_pMenuExport)
@@ -1473,7 +1514,9 @@ void CSbieView::OnSandBoxAction(QAction* Action, const QList<CSandBoxPtr>& SandB
 	}
 	else if (Action == m_pMenuRemove)
 	{
-		if (QMessageBox("Sandboxie-Plus", tr("Do you really want to remove the selected sandbox(es)?<br /><br />Warning: The box content will also be deleted!"), QMessageBox::Warning, QMessageBox::Yes, QMessageBox::No | QMessageBox::Default | QMessageBox::Escape, QMessageBox::NoButton, this).exec() != QMessageBox::Yes)
+		QString message = tr("Do you really want to remove the following sandbox(es)?<br /><br />%1<br /><br />Warning: The box content will also be deleted!")
+			.arg(RenderSandboxNameList_(SandBoxes));
+		if (QMessageBox("Sandboxie-Plus", message, QMessageBox::Warning, QMessageBox::Yes, QMessageBox::No | QMessageBox::Default | QMessageBox::Escape, QMessageBox::NoButton, this).exec() != QMessageBox::Yes)
 			return;
 
 		bool bChanged = false;
@@ -1534,24 +1577,32 @@ void CSbieView::OnSandBoxAction(QAction* Action, const QList<CSandBoxPtr>& SandB
 				if(!theGUI->OpenRecovery(SandBoxes.first(), DeleteSnapshots))
 					return;
 			}
-			else {
-				if (SandBoxes.first()->HasSnapshots()) {
-					if(CCheckableMessageBox::question(this, "Sandboxie-Plus", tr("Do you want to delete the content of the selected sandbox?")
+			else
+			{
+				QString message = tr("Do you want to delete the content of the following sandbox?<br /><br />%1")
+					.arg(RenderSandboxNameList_(SandBoxes));
+				
+				if (SandBoxes.first()->HasSnapshots())
+				{
+					if(CCheckableMessageBox::question(this, "Sandboxie-Plus", message
 					, tr("Also delete all Snapshots"), &DeleteSnapshots, QDialogButtonBox::Yes | QDialogButtonBox::No, QDialogButtonBox::Yes) != QDialogButtonBox::Yes)
 						return;
 				}
-				else {
-					if(QMessageBox::question(this, "Sandboxie-Plus", tr("Do you want to delete the content of the selected sandbox?")
-					, QMessageBox::Yes, QMessageBox::No) != QMessageBox::Yes)
+				else
+				{
+					if(QMessageBox::question(this, "Sandboxie-Plus", message , QMessageBox::Yes, QMessageBox::No) != QMessageBox::Yes)
 						return;
 				}
 			}
-
-			
 		}
-		else if(CCheckableMessageBox::question(this, "Sandboxie-Plus", tr("Do you really want to delete the content of all selected sandboxes?")
-			, tr("Also delete all Snapshots"), &DeleteSnapshots, QDialogButtonBox::Yes | QDialogButtonBox::No, QDialogButtonBox::Yes) != QDialogButtonBox::Yes)
+		else
+		{
+			QString message = tr("Do you really want to delete the content of the following sandboxes?<br /><br />%1")
+				.arg(RenderSandboxNameList_(SandBoxes));
+			if(CCheckableMessageBox::question(this, "Sandboxie-Plus", message
+				, tr("Also delete all Snapshots"), &DeleteSnapshots, QDialogButtonBox::Yes | QDialogButtonBox::No, QDialogButtonBox::Yes) != QDialogButtonBox::Yes)
 				return;
+		}
 
 		foreach(const CSandBoxPtr& pBox, SandBoxes)
 		{

@@ -383,7 +383,15 @@ void COptionsWindow::LoadGeneral()
 
 	ui.chkAllowEfs->setChecked(m_pBox->GetBool("EnableEFS", false));
 
-	ui.txtNotes->setPlainText(m_pBox->GetTextList("Note", false).join("\n"));
+	QString Note;
+	foreach(QString Value, m_pBox->GetTextList("Note", false)) {
+		if (!Note.isEmpty())
+			Note += "\n";
+		if (Value == "_")
+			Value = "";
+		Note += Value;
+	}
+	ui.txtNotes->setPlainText(Note);
 
 	OnGeneralChanged();
 
@@ -519,8 +527,14 @@ void COptionsWindow::SaveGeneral()
 	WriteAdvancedCheck(ui.chkAllowEfs, "EnableEFS", "y", "");
 
 	m_pBox->DelValue("Note");
-	foreach(const QString& Value, ui.txtNotes->toPlainText().split("\n"))
-		m_pBox->AppendText("Note", Value);
+	QString Note = ui.txtNotes->toPlainText();
+	if (!Note.isEmpty()) {
+		foreach(QString Value, Note.split("\n")) {
+			if (Value == "")
+				Value = "_";
+			m_pBox->AppendText("Note", Value);
+		}
+	}
 
 	m_GeneralChanged = false;
 }
