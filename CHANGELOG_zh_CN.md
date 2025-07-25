@@ -3,6 +3,75 @@
 本项目遵循 [语义化版本控制](http://semver.org/)。
 
 
+## [1.16.0 / 5.71.0] - 2025-06-03
+
+### 新增
+- 在捐赠支持页面新增了复制硬件 ID 的选项
+- 新增 `MarkOfTheWebBox=BoxName` 选项，可将所有带有“网络标记”的文件强制放入指定的预设沙盒中
+- 为强制进程新增了通配符支持 [#2603](https://github.com/sandboxie-plus/Sandboxie/issues/2603)
+- 在跟踪日志页面的 “类型” 下拉菜单中，新增了文本缩放的正确支持，防止在应用显示缩放时文本被截断 [#4812](https://github.com/sandboxie-plus/Sandboxie/pull/4812)（感谢 wzxjohn）
+- 新增了对 EventPair 和 KeyedEvent 对象的虚拟化处理
+- 为 Timer 对象新增了筛选和虚拟化功能
+- 新增了创建虚拟沙盘（不会存储在 sandboxie ini 文件中）的选项
+- 新增了 `UseSandboxieUAC=y` 选项，可以使用沙盘内置的 UAC 替代系统默认的 UAC 提示
+  - 注意：新的 UAC 提示还提供仅授予应用程序“伪管理员权限”的选项
+
+### 更改
+- 重构了 **DNS 过滤器逻辑**，即便未发生 DNS 解析，或者未返回有效 IP 地址时也能进行过滤 [#4811](https://github.com/sandboxie-plus/Sandboxie/pull/4811)（感谢 wzxjohn）
+  - 之前只有在发起了 DNS 请求并收到有效响应（如 IP 地址）时，DNS 过滤才会生效
+  - 这会导致诸如未解析域名无法被修改和在过滤期间潜在的信息泄露等问题
+- 所有组件均启用了 `/GS`
+- 驱动程序启用了 `/CETCOMPAT`
+- 重构了 ini 配置文件的处理逻辑 [#4492](https://github.com/sandboxie-plus/Sandboxie/issues/4492)
+  - 新增 `ImportBox=C:\path\To\Box.ini`
+  - 新增了无需 ini 文件即可在驱动层创建虚拟配置区段的机制
+- 改进了移动沙箱右键菜单 [#4819](https://github.com/sandboxie-plus/Sandboxie/issues/4819)
+
+### 修复
+- 在 Firefox 138 及以上版本全屏时，任务栏依然显示在顶部的问题 [#4761](https://github.com/sandboxie-plus/Sandboxie/issues/4761)
+- 修复了删除多项内容时的多余选项 [#4817](https://github.com/sandboxie-plus/Sandboxie/issues/4817)
+- 修复了 Sandboxie Plus 意外关闭的问题
+- 修复了页面显示异常 [#4810](https://github.com/sandboxie-plus/Sandboxie/issues/4810)
+- 修复了在 Windows 11 上通过右键菜单运行程序时的工作目录问题 [#4844](https://github.com/sandboxie-plus/Sandboxie/pull/4844)（感谢 micbou）
+
+
+## [1.15.12 / 5.70.12] - 2025-05-01
+
+### 新增
+- 为 Plus 界面新增印度尼西亚语翻译 [4bad4d1](https://github.com/sandboxie-plus/Sandboxie/commit/4bad4d190a90a6329d549e5a31ca8ee13b4eb9a1)（感谢 ？？？）
+- 新增 WeType 输入法（IME）模板 [#4715](https://github.com/sandboxie-plus/Sandboxie/pull/4715)（感谢 bot-1450）
+- 在代理配置中新增主机名支持（在 WSA_Startup 时查找主机）
+- Sandboxie 现在支持绑定到适配器，而非仅绑定 IP（在 WSA_Startup 时解析 IP）
+- 新增对 %ProgramFiles(x86)% 变量的支持 [#2402](https://github.com/sandboxie-plus/Sandboxie/issues/2402)
+- 新增 TemplateDefaultFolders，包含所有需在增强隐私盒中创建的默认路径
+
+### 更改
+- 修正了沙盒列表中的异常排序问题 [#4615](https://github.com/sandboxie-plus/Sandboxie/issues/4615)
+- 支持标签页中的名称与 HwID 信息默认隐藏，可按需切换显示 [#4714](https://github.com/sandboxie-plus/Sandboxie/pull/4714)
+- 新增可选的代理中继实现（不再篡改现有套接字，而是启动中继线程）[实验性]
+
+### 修复
+- 修复了“在沙盒中运行”选择提示未显示沙盒别名的问题 [#4709](https://github.com/sandboxie-plus/Sandboxie/issues/4709)
+- 修复了使用 Ctrl+F 后，沙盒分组的展开和关闭记录被打乱的问题 [#4708](https://github.com/sandboxie-plus/Sandboxie/issues/4708)
+- 为注册表的 set/get 函数添加了额外的检查
+- 修复了 Pool_Alloc 中的问题
+- 修复了 SbieCtrl.exe 在 Process Explorer 中持续维持 3.2MB/s IO 速率的问题 [#4693](https://github.com/sandboxie-plus/Sandboxie/issues/4693)
+- 修复了腾讯 TIM 模板导致无法使用拖放功能的问题 [#4688](https://github.com/sandboxie-plus/Sandboxie/issues/4688)
+- 改进了 Sandboxie.ini 文件很大时响应速度变慢的问题 [#4573](https://github.com/sandboxie-plus/Sandboxie/issues/4573)
+- 修复了 Msi 安装过程中无法在数据保护沙盒中创建 AppData\Romaing\Microsoft 文件夹的问题 [#4711](https://github.com/sandboxie-plus/Sandboxie/issues/4711)
+- 修复了 Sandboxie 在时间加速相关的两个错误，并新增了两个时间函数的钩子 [#4721](https://github.com/sandboxie-plus/Sandboxie/pull/4721)（感谢 pwnmelife）
+- 修复了协议选择的翻译字符串被保存到配置文件中的问题
+- 修复了沙盒选择器图标
+- 修复了切换 UI 语言时工具栏未更新的问题 [#4726](https://github.com/sandboxie-plus/Sandboxie/issues/4726)
+- 修复了 PingInfoView 在 Sandboxie 中运行时报错的问题 [#4718](https://github.com/sandboxie-plus/Sandboxie/issues/4718)
+- 修复了卸载注册表项未找到时，CollectProducts() 卡在循环中的问题 [#4753](https://github.com/sandboxie-plus/Sandboxie/issues/4753)
+- 修复了与 SbieDll.dll 相关的崩溃问题 [#4754](https://github.com/sandboxie-plus/Sandboxie/issues/4754)
+- 修复了在创建快捷方式时自动下载文件的问题 [#4663](https://github.com/sandboxie-plus/Sandboxie/issues/4663) [4750](https://github.com/sandboxie-plus/Sandboxie/pull/4750)（感谢 WZ-Tong）
+
+### 移除
+- 移除了无效的“删除内容”按钮 [#4720](https://github.com/sandboxie-plus/Sandboxie/pull/4720)（感谢 habatake）
+
+
 ## [1.15.11 / 5.70.11] - 2025-04-16
 
 ### 修复
@@ -170,7 +239,7 @@
 
 ### 更改
 - 改进支持通知
-- 改进删除 Sandboxie Plus 残余文件的功能 [#4374](https://github.com/sandboxie-plus/Sandboxie/pull/4374)
+- 改进卸载 Sandboxie Plus 残余文件的问题 [#4374](https://github.com/sandboxie-plus/Sandboxie/pull/4374)
 
 ### 修复
 - 修复 ARM64 平台上的 SSL 问题，导致更新程序和证书检索失败
@@ -184,7 +253,7 @@
 - 添加 "DiskSerialNumber=DeviceName,1234-ABCD" 以设置单个沙箱的磁盘序列号（感谢 Yeyixiao)
 - 添加在全局设置的编辑框中隐藏证书的功能（灵感来自 Yeyixiao)
 - 添加同时在多个沙箱中打开程序的功能 [#4231](https://github.com/sandboxie-plus/Sandboxie/issues/4231)
-- 在沙箱设置中添加 "Description" 字段 [#4243](https://github.com/sandboxie-plus/Sandboxie/issues/4243)
+- 在沙箱设置中添加 "描述（Description）" 字段 [#4243](https://github.com/sandboxie-plus/Sandboxie/issues/4243)
 - 添加 "NotifyMsiInstaller=y"，默认启用以在沙箱中运行没有推荐排除项的 MSI 安装程序时显示消息 SBIE2194 [#4330](https://github.com/sandboxie-plus/Sandboxie/issues/4330)
   - SBIE2194： MSI 安装程序需要在 INI 中设置 'MsiInstallerExemptions=y' 选项才能正确工作，然而此选项会削弱隔离。
 - 添加隐藏已安装程序的选项 [#4139](https://github.com/sandboxie-plus/Sandboxie/issues/4139)

@@ -877,6 +877,7 @@ void COptionsWindow::LoadConfig()
 	LoadNetFwRules();
 	LoadDnsFilter();
 	LoadNetProxy();
+	LoadNetwork();
 
 	LoadAccessList();
 
@@ -1014,6 +1015,8 @@ void COptionsWindow::SaveConfig()
 			SaveDnsFilter();
 		if (m_NetProxyChanged)
 			SaveNetProxy();
+		if (m_NetworkChanged)
+			SaveNetwork();
 
 		if (m_AccessChanged) {
 			SaveAccessList();
@@ -1039,7 +1042,7 @@ void COptionsWindow::SaveConfig()
 	}
 
 	m_pBox->SetRefreshOnChange(true);
-	m_pBox->GetAPI()->CommitIniChanges();
+	m_pBox->CommitIniChanges();
 
 	if (UpdatePaths)
 		TriggerPathReload();
@@ -1063,7 +1066,7 @@ bool COptionsWindow::apply()
 	else
 	{
 		if (m_GeneralChanged) {
-			CSandBoxPlus* pBoxEx = qobject_cast<CSandBoxPlus*>(m_pBox.data());
+			auto pBoxEx = m_pBox.objectCast<CSandBoxPlus>();
 			if (ui.chkEncrypt->isChecked() && !QFile::exists(pBoxEx->GetBoxImagePath())) {
 				if (m_Password.isEmpty())
 					OnSetPassword();
@@ -1249,7 +1252,7 @@ void COptionsWindow::UpdateCurrentTab()
 		else
 		{
 			ui.chkNoWindowRename->setEnabled(true);
-			ui.chkNoWindowRename->setChecked(IsAccessEntrySet(eWnd, "", eOpen, "#"));
+			ui.chkNoWindowRename->setChecked(IsAccessEntrySet(eWnd, "", eNoRename, "*"));
 		}
 	}
 }
@@ -1311,11 +1314,11 @@ void COptionsWindow::LoadIniSection()
 	{
 		m_Settings = m_pBox->GetIniSection(NULL, m_Template);
 
-		for (QList<QPair<QString, QString>>::const_iterator I = m_Settings.begin(); I != m_Settings.end(); ++I)
-			Section += I->first + "=" + I->second + "\n";
+		for (QList<CSbieIni::SbieIniValue>::const_iterator I = m_Settings.begin(); I != m_Settings.end(); ++I)
+			Section += I->Name + "=" + I->Value + "\n";
 	}
 	else
-		Section = m_pBox->GetAPI()->SbieIniGetEx(m_pBox->GetName(), "");
+		Section = m_pBox->SbieIniGetEx(m_pBox->GetName(), "");
 
 	m_HoldChange = true;
 	//ui.txtIniSection->setPlainText(Section);
@@ -1358,10 +1361,10 @@ void COptionsWindow::SaveIniSection()
 	//	m_pBox->AppendText(I->first, I->second);
 
 	m_pBox->SetRefreshOnChange(true);
-	m_pBox->GetAPI()->CommitIniChanges();*/
+	m_pBox->CommitIniChanges();*/
 
 	//m_pBox->GetAPI()->SbieIniSet(m_pBox->GetName(), "", ui.txtIniSection->toPlainText());
-	m_pBox->GetAPI()->SbieIniSet(m_pBox->GetName(), "", m_pCodeEdit->GetCode());
+	m_pBox->SbieIniSet(m_pBox->GetName(), "", m_pCodeEdit->GetCode());
 
 	//LoadIniSection();
 }

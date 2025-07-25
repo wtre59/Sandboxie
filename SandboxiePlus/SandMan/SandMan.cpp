@@ -895,42 +895,38 @@ void CSandMan::OnToolBarMenuItemClicked(const QString& scriptName)
 
 void CSandMan::CreateToolBarConfigMenu(const QList<ToolBarAction>& actions, const QSet<QString>& currentItems)
 {
-	static QMenu* m_pToolBarContextMenu = NULL;
-	if (!m_pToolBarContextMenu)
+	m_pToolBarContextMenu = new QMenu(tr("Toolbar Items"), m_pToolBar);
+
+	m_pToolBarContextMenu->addAction(tr("Reset Toolbar"), this, &CSandMan::OnResetToolBarMenuConfig);
+	m_pToolBarContextMenu->addSeparator();
+
+	for (auto sa : actions)
 	{
-		m_pToolBarContextMenu = new QMenu(tr("Toolbar Items"), this);
-
-		m_pToolBarContextMenu->addAction(tr("Reset Toolbar"), this, &CSandMan::OnResetToolBarMenuConfig);
-		m_pToolBarContextMenu->addSeparator();
-
-		for (auto sa : actions)
-		{
-			if (sa.scriptName == nullptr) {
-				m_pToolBarContextMenu->addSeparator();
-				continue;
-			}
-
-			QString text = sa.scriptName;
-			if (!sa.nameOverride.isEmpty())
-				text = sa.nameOverride;
-			else if (sa.action)
-				text = sa.action->text();  // tr: already localised
-			else
-				qDebug() << "ERROR: Missing display name for " << sa.scriptName;
-
-			auto scriptName = sa.scriptName;
-			//auto menuAction = m_pToolBarContextMenu->addAction(text, this, [scriptName, this]() {
-			auto menuAction = new QCheckBox(text);
-			QWidgetAction* menuEntry = new QWidgetAction(this);
-			menuEntry->setDefaultWidget(menuAction);
-			m_pToolBarContextMenu->addAction(menuEntry);
-			connect(menuAction, &QCheckBox::clicked, this, [scriptName, this]() {
-				OnToolBarMenuItemClicked(scriptName);
-				}
-			);
-			//menuAction->setCheckable(true);
-			menuAction->setChecked(currentItems.contains(sa.scriptName));
+		if (sa.scriptName == nullptr) {
+			m_pToolBarContextMenu->addSeparator();
+			continue;
 		}
+
+		QString text = sa.scriptName;
+		if (!sa.nameOverride.isEmpty())
+			text = sa.nameOverride;
+		else if (sa.action)
+			text = sa.action->text();  // tr: already localised
+		else
+			qDebug() << "ERROR: Missing display name for " << sa.scriptName;
+
+		auto scriptName = sa.scriptName;
+		//auto menuAction = m_pToolBarContextMenu->addAction(text, this, [scriptName, this]() {
+		auto menuAction = new QCheckBox(text);
+		QWidgetAction* menuEntry = new QWidgetAction(this);
+		menuEntry->setDefaultWidget(menuAction);
+		m_pToolBarContextMenu->addAction(menuEntry);
+		connect(menuAction, &QCheckBox::clicked, this, [scriptName, this]() {
+			OnToolBarMenuItemClicked(scriptName);
+			}
+		);
+		//menuAction->setCheckable(true);
+		menuAction->setChecked(currentItems.contains(sa.scriptName));
 	}
 
 	m_pToolBar->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -1943,9 +1939,15 @@ void CSandMan::timerEvent(QTimerEvent* pEvent)
 				}
 			}
 
+			QString AllTemplatesStr;
+			foreach(auto& Templates, AllTemplates) {
+				AllTemplatesStr.append(QString::fromWCharArray(L"\u2022 ")); // Unicode bullet
+				AllTemplatesStr.append("<b>" + Templates  + "</b><br />");
+			}
+
 			bool State = false;
-			CleanupTemplates = CCheckableMessageBox::question(this, "Sandboxie-Plus", tr("Some compatibility templates (%1) are missing, probably deleted, do you want to remove them from all boxes?")
-				.arg(AllTemplates.join(", "))
+			CleanupTemplates = CCheckableMessageBox::question(this, "Sandboxie-Plus", tr("Some compatibility templates are missing:<br /><br />%1<br />Probably deleted, do you want to remove them from all boxes?")
+				.arg(AllTemplatesStr)
 				, tr("Don't show this message again."), &State, QDialogButtonBox::Yes | QDialogButtonBox::No, QDialogButtonBox::Yes, QMessageBox::Information) == QDialogButtonBox::Yes ? 1 : 0;
 
 			if (State)
@@ -1967,6 +1969,9 @@ void CSandMan::timerEvent(QTimerEvent* pEvent)
 				foreach(const QString & Template, I.value())
 					Section->DelValue("Template", Template);
 				Section->SetRefreshOnChange(true);
+				auto pBoxEx = Section.objectCast<CSandBoxPlus>();
+				if (pBoxEx && pBoxEx->IsPortable())
+					pBoxEx->CommitIniChanges();
 			}
 
 			theAPI->CommitIniChanges();
@@ -2389,7 +2394,7 @@ void CSandMan::OnBoxClosed(const CSandBoxPtr& pBox)
 	if (!to_delete.isEmpty()) {
 		foreach(const QString& Value, to_delete) {
 			if (tempValLocalPrefix.compare(Value.left(11)) == 0)
-				theAPI->SbieIniSet("Template_" + tempValLocalPrefix, "*", "", CSbieAPI::eIniUpdate);
+				theAPI->SbieIniSet("Template_" + tempValLocalPrefix, "*", "", CSbieIni::eIniUpdate);
 			list.removeAt(list.indexOf(Value));
 		}
 		pBox->UpdateTextList("Template", list, FALSE);
@@ -2459,19 +2464,23 @@ void CSandMan::OnStatusChanged()
 			if (PortableRootDir == 2)
 			{
 				QString NtBoxRoot = theAPI->GetGlobalSettings()->GetText("FileRootPath", "\\??\\%SystemDrive%\\Sandbox\\%USER%\\%SANDBOX%", false, false).replace("GlobalSettings", "[BoxName]");
+				QString DosBoxPath = theAPI->Nt2DosPath(NtBoxRoot);
 
-				bool State = false;
-				PortableRootDir = CCheckableMessageBox::question(this, "Sandboxie-Plus",
-					tr("Sandboxie-Plus was started in portable mode, do you want to put the Sandbox folder into its parent directory?\nYes will choose: %1\nNo will choose: %2")
-					.arg(BoxPath + "\\[BoxName]")
-					.arg(theAPI->Nt2DosPath(NtBoxRoot))
-					, tr("Don't show this message again."), &State, QDialogButtonBox::Yes | QDialogButtonBox::No, QDialogButtonBox::Yes, QMessageBox::Information) == QDialogButtonBox::Yes ? 1 : 0;
+				if (DosBoxPath != BoxPath + "\\%SANDBOX%")
+				{
+					bool State = false;
+					PortableRootDir = CCheckableMessageBox::question(this, "Sandboxie-Plus",
+						tr("Sandboxie-Plus was started in portable mode, do you want to put the Sandbox folder into its parent directory?\nYes will choose: %1\nNo will choose: %2")
+						.arg(BoxPath + "\\[BoxName]")
+						.arg(DosBoxPath)
+						, tr("Don't show this message again."), &State, QDialogButtonBox::Yes | QDialogButtonBox::No, QDialogButtonBox::Yes, QMessageBox::Information) == QDialogButtonBox::Yes ? 1 : 0;
 
-				if (State)
-					theConf->SetValue("Options/PortableRootDir", PortableRootDir);
+					if (State)
+						theConf->SetValue("Options/PortableRootDir", PortableRootDir);
+				}
 			}
 
-			if (PortableRootDir)
+			if (PortableRootDir == 1)
 				theAPI->GetGlobalSettings()->SetText("FileRootPath", BoxPath + "\\%SANDBOX%");
 		}
 
