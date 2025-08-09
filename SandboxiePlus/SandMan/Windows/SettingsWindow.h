@@ -138,6 +138,8 @@ private slots:
 
 	void SetIniEdit(bool bEnable);
 	void OnEditIni();
+	void OnIniValidationToggled(int state);
+	void OnTooltipToggled(int state);
 	void OnSaveIni();
 	void OnIniChanged();
 	void OnCancelEdit();
@@ -211,7 +213,11 @@ private:
 
 	Ui::SettingsWindow ui;
 
-	class CCodeEdit* m_pCodeEdit;
+	class CCodeEdit* m_pCodeEdit = nullptr;
+
+	bool m_IniValidationEnabled = true;
+	bool m_TooltipsEnabled = true;
+	class CIniHighlighter* m_pIniHighlighter = nullptr;
 };
 
 QVariantMap GetRunEntry(const QString& sEntry);

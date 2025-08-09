@@ -342,6 +342,10 @@ CSettingsWindow::CSettingsWindow(QWidget* parent)
 	connect(ui.chkShowRecovery, SIGNAL(stateChanged(int)), this, SLOT(OnOptChanged()));
 	connect(ui.chkCheckDelete, SIGNAL(stateChanged(int)), this, SLOT(OnOptChanged()));
 	connect(ui.chkRecoveryTop, SIGNAL(stateChanged(int)), this, SLOT(OnOptChanged()));
+
+	connect(ui.chkUseW11Style, SIGNAL(stateChanged(int)), this, SLOT(OnOptChanged()));
+	QOperatingSystemVersion current = QOperatingSystemVersion::current();
+	ui.chkUseW11Style->setEnabled(current.majorVersion() == 10 && current.microVersion() >= 22000); // Windows 10 22000+ (Windows 11)
 	//
 
 	// Shell Integration
@@ -506,7 +510,7 @@ CSettingsWindow::CSettingsWindow(QWidget* parent)
 	//
 
 	connect(ui.chkSandboxMoTW, SIGNAL(stateChanged(int)), this, SLOT(OnMoTWChange()));
-	connect(ui.cmbMoTWSandbox, SIGNAL(stateChanged(int)), this, SLOT(OnMoTWChange()));
+	connect(ui.cmbMoTWSandbox, SIGNAL(currentIndexChanged(int)), this, SLOT(OnMoTWChange()));
 
 	// USB
 	connect(ui.chkSandboxUsb, SIGNAL(stateChanged(int)), this, SLOT(OnVolumeChanged()));
@@ -582,11 +586,21 @@ CSettingsWindow::CSettingsWindow(QWidget* parent)
 	ui.btnResetIniFont->setIcon(CSandMan::GetIcon("ResetFont"));
 	ui.btnResetIniFont->setToolTip(tr("Reset font"));
 
-	m_pCodeEdit = new CCodeEdit(new CIniHighlighter(theGUI->m_DarkTheme));
+	// Initialize validation flag from config, fallback to checkbox if not set
+	bool defaultValidation = theConf->GetBool("Options/ValidateIniKeys", ui.chkValidateIniKeys->isChecked());
+	ui.chkValidateIniKeys->setChecked(defaultValidation);
+	m_IniValidationEnabled = defaultValidation;
+	bool defaultTooltip = theConf->GetBool("Options/EnableIniTooltips", ui.chkEnableTooltips->isChecked());
+	ui.chkEnableTooltips->setChecked(defaultTooltip);
+	m_TooltipsEnabled = defaultTooltip;
+
+	// Create initial highlighter and editor
+	m_pIniHighlighter = new CIniHighlighter(theGUI->m_DarkTheme, nullptr, m_IniValidationEnabled);
+	m_pCodeEdit = new CCodeEdit(m_pIniHighlighter);
 	m_pCodeEdit->installEventFilter(this);
 	ui.txtIniSection->parentWidget()->layout()->replaceWidget(ui.txtIniSection, m_pCodeEdit);
 	delete ui.txtIniSection;
-	ui.txtIniSection = NULL;
+	ui.txtIniSection = nullptr;
 	connect(m_pCodeEdit, SIGNAL(textChanged()), this, SLOT(OnIniChanged()));
 
 	ApplyIniEditFont();
@@ -594,6 +608,8 @@ CSettingsWindow::CSettingsWindow(QWidget* parent)
 	connect(ui.btnSelectIniFont, SIGNAL(clicked(bool)), this, SLOT(OnSelectIniEditFont()));
 	connect(ui.btnResetIniFont, SIGNAL(clicked(bool)), this, SLOT(OnResetIniEditFont()));
 	connect(ui.btnEditIni, SIGNAL(clicked(bool)), this, SLOT(OnEditIni()));
+	connect(ui.chkValidateIniKeys, SIGNAL(stateChanged(int)), this, SLOT(OnIniValidationToggled(int)));
+	connect(ui.chkEnableTooltips, SIGNAL(stateChanged(int)), this, SLOT(OnTooltipToggled(int)));
 	connect(ui.btnSaveIni, SIGNAL(clicked(bool)), this, SLOT(OnSaveIni()));
 	connect(ui.btnCancelEdit, SIGNAL(clicked(bool)), this, SLOT(OnCancelEdit()));
 	//connect(ui.txtIniSection, SIGNAL(textChanged()), this, SLOT(OnIniChanged()));
@@ -803,6 +819,70 @@ bool CSettingsWindow::eventFilter(QObject *source, QEvent *event)
 
 		if (event->type() == QEvent::FocusOut) {
 			m_bRightButtonPressed = false;
+		}
+	}
+
+	// Tooltip handling
+	if (source == m_pCodeEdit && event->type() == QEvent::ToolTip) {
+		// If tooltips are disabled, don't show any tooltips
+		if (!m_TooltipsEnabled)
+			return false;
+
+		QHelpEvent* helpEvent = static_cast<QHelpEvent*>(event);
+
+		// Find the text edit widget inside CCodeEdit
+		QTextEdit* pTextEdit = m_pCodeEdit->findChild<QTextEdit*>();
+		if (pTextEdit) {
+			// Convert mouse position to text cursor position
+			QPoint pos = pTextEdit->viewport()->mapFrom(m_pCodeEdit, helpEvent->pos());
+			QTextCursor cursor = pTextEdit->cursorForPosition(pos);
+
+			// Get the current line to check if it's a comment
+			QTextBlock block = cursor.block();
+			QString currentLine = block.text();
+
+			// Don't show tooltips for comment lines
+			if (CIniHighlighter::IsCommentLine(currentLine))
+				return false;
+
+			// Custom word selection that includes dots and underscores
+			int initialPos = cursor.position() - block.position();
+			int startPos = initialPos;
+			int endPos = initialPos;
+
+			// Move to start of the word
+			while (startPos > 0) {
+				QChar c = currentLine[startPos - 1];
+				if (c.isLetterOrNumber() || c == '_' || c == '.')
+					startPos--;
+				else
+					break;
+			}
+
+			// Move to end of the word
+			while (endPos < currentLine.length()) {
+				QChar c = currentLine[endPos];
+				if (c.isLetterOrNumber() || c == '_' || c == '.')
+					endPos++;
+				else
+					break;
+			}
+
+			// Extract the complete identifier including dots
+			QString word = currentLine.mid(startPos, endPos - startPos);
+
+			// Show tooltip if it's a valid setting
+			if (!word.isEmpty() && word.contains(QRegularExpression("^[a-zA-Z0-9_.]+$"))) {
+				// Only try to show tooltips if settings are loaded
+				if (CIniHighlighter::IsSettingsLoaded()) {
+					QString tooltipText = CIniHighlighter::GetSettingTooltip(word);
+					if (!tooltipText.isEmpty()) {
+						QToolTip::showText(helpEvent->globalPos(), tooltipText, pTextEdit);
+						return true;
+					}
+				}
+			}
+			QToolTip::hideText();
 		}
 	}
 	return QDialog::eventFilter(source, event);
@@ -1060,6 +1140,8 @@ void CSettingsWindow::LoadSettings()
 	ui.cmbOnClose->setCurrentIndex(ui.cmbOnClose->findData(theConf->GetString("Options/OnClose", "ToTray")));
 	ui.chkMinimize->setChecked(theConf->GetBool("Options/MinimizeToTray", false));
 	ui.chkSingleShow->setChecked(theConf->GetBool("Options/TraySingleClick", false));
+
+	ui.chkUseW11Style->setChecked(theConf->GetBool("Options/UseW11Style", false));
 
 	OnLoadAddon();
 
@@ -1624,6 +1706,8 @@ void CSettingsWindow::SaveSettings()
 	theConf->SetValue("Options/OnClose", ui.cmbOnClose->currentData());
 	theConf->SetValue("Options/MinimizeToTray", ui.chkMinimize->isChecked());
 	theConf->SetValue("Options/TraySingleClick", ui.chkSingleShow->isChecked());
+
+	theConf->SetValue("Options/UseW11Style", ui.chkUseW11Style->isChecked());
 
 	if (theAPI->IsConnected())
 	{
@@ -2340,6 +2424,43 @@ void CSettingsWindow::SetIniEdit(bool bEnable)
 void CSettingsWindow::OnEditIni()
 {
 	SetIniEdit(true);
+}
+
+void CSettingsWindow::OnIniValidationToggled(int state)
+{
+	m_HoldChange = true;
+
+	m_IniValidationEnabled = (state == Qt::Checked);
+
+	// Save the new value to config
+	theConf->SetValue("Options/ValidateIniKeys", m_IniValidationEnabled);
+
+	// Remove previous highlighter
+	if (m_pIniHighlighter) {
+		delete m_pIniHighlighter;
+		m_pIniHighlighter = nullptr;
+	}
+
+	// Attach new highlighter to the code editor's document
+	QTextEdit* pTextEdit = m_pCodeEdit->findChild<QTextEdit*>();
+	if (pTextEdit) {
+		m_pIniHighlighter = new CIniHighlighter(theGUI->m_DarkTheme, pTextEdit->document(), m_IniValidationEnabled);
+		m_pIniHighlighter->rehighlight();
+	}
+
+	m_HoldChange = false;
+}
+
+void CSettingsWindow::OnTooltipToggled(int state)
+{
+	m_HoldChange = true;
+
+	m_TooltipsEnabled = (state == Qt::Checked);
+
+	// Save the new value to config
+	theConf->SetValue("Options/EnableIniTooltips", m_TooltipsEnabled);
+
+	m_HoldChange = false;
 }
 
 void CSettingsWindow::OnSaveIni()
